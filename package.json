@@ -1,0 +1,22 @@
+{
+  "name": "movie-watchlist",
+  "version": "1.0.0",
+  "description": "A CRUD web application for tracking movies with OMDb API integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "movies",
+    "watchlist",
+    "crud",
+    "omdb"
+  ],
+  "author": "Dominic Marasigan",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "express": "^4.21.0"
+  }
+}

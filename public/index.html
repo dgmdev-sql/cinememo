@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Cinememo — Track your favorite movies with OMDb search integration">
+  <title>Cinememo</title>
+
+  <!-- Preconnect for faster font loading -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Theme script — runs immediately to prevent flash of wrong theme -->
+  <script>
+    (function () {
+      const KEY = 'theme';
+      const root = document.documentElement;
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      let animTimeout;
+
+      // Get saved preference or default to 'system'
+      function getPref() {
+        try {
+          const val = localStorage.getItem(KEY);
+          return (val === 'dark' || val === 'light' || val === 'system') ? val : 'system';
+        } catch (e) { return 'system'; }
+      }
+
+      // Check if the effective theme should be dark
+      function shouldBeDark(pref) {
+        return pref === 'dark' || (pref === 'system' && mq.matches);
+      }
+
+      // Apply the theme class and update toggle button states
+      function applyTheme(pref) {
+        root.classList.toggle('dark', shouldBeDark(pref));
+        try {
+          document.querySelectorAll('[data-theme-opt]').forEach(function (el) {
+            el.classList.toggle('is-active', el.getAttribute('data-theme-opt') === pref);
+          });
+        } catch (e) {}
+      }
+
+      // Public function: set theme with circular wipe transition (View Transitions API)
+      window.setTheme = function (pref, event) {
+        try { localStorage.setItem(KEY, pref); } catch (e) {}
+
+        const isSwitching = shouldBeDark(pref) !== root.classList.contains('dark');
+        if (!isSwitching) {
+          applyTheme(pref);
+          return;
+        }
+
+        // Check if browser supports View Transitions API
+        if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          root.classList.add('theme-transition');
+          applyTheme(pref);
+          clearTimeout(animTimeout);
+          animTimeout = setTimeout(function () { root.classList.remove('theme-transition'); }, 450);
+          return;
+        }
+
+        // Animation starts exactly where the user clicked, or defaults to top-right
+        const x = (event && event.clientX) !== undefined ? event.clientX : window.innerWidth;
+        const y = (event && event.clientY) !== undefined ? event.clientY : 0;
+
+        // Calculate max radius needed to cover the screen from the click point
+        const endRadius = Math.hypot(
+          Math.max(x, window.innerWidth - x),
+          Math.max(y, window.innerHeight - y)
+        );
+
+        // Execute transition
+        const transition = document.startViewTransition(function() {
+          applyTheme(pref);
+        });
+
+        // Animate the clip-path
+        transition.ready.then(function() {
+          document.documentElement.animate(
+            {
+              clipPath: [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${endRadius}px at ${x}px ${y}px)`
+              ]
+            },
+            {
+              duration: 540,
+              easing: 'cubic-bezier(.32,.08,.24,1)',
+              pseudoElement: '::view-transition-new(root)'
+            }
+          );
+        });
+      };
+
+      // Apply immediately on page load (no flash)
+      applyTheme(getPref());
+
+      // Listen for OS theme changes when set to 'system'
+      mq.addEventListener('change', function () {
+        if (getPref() === 'system') {
+          root.classList.add('theme-transition');
+          applyTheme('system');
+          clearTimeout(animTimeout);
+          animTimeout = setTimeout(function () {
+            root.classList.remove('theme-transition');
+          }, 450);
+        }
+      });
+
+      // Re-apply on DOMContentLoaded to set toggle button states
+      document.addEventListener('DOMContentLoaded', function () {
+        applyTheme(getPref());
+      });
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- ============================================================
+       HEADER — Clean top bar with title and theme toggle
+       ============================================================ -->
+  <header>
+    <div class="header-inner">
+      <a href="/" class="header-logo" aria-label="Movie Watchlist Home">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+          <line x1="7" y1="2" x2="7" y2="22"></line>
+          <line x1="17" y1="2" x2="17" y2="22"></line>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <line x1="2" y1="7" x2="7" y2="7"></line>
+          <line x1="2" y1="17" x2="7" y2="17"></line>
+          <line x1="17" y1="17" x2="22" y2="17"></line>
+          <line x1="17" y1="7" x2="22" y2="7"></line>
+        </svg>
+        <span class="header-title">cine<span class="dot">.</span>memo</span>
+      </a>
+
+      <div class="header-right">
+        <!-- Theme toggle (System / Light / Dark) -->
+        <div class="theme-switch" role="group" aria-label="Theme">
+          <button type="button" data-theme-opt="system" onclick="setTheme('system', event)"
+                  class="theme-opt" title="System" aria-label="System theme">
+            <svg viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M9 21h6M12 17v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" data-theme-opt="light" onclick="setTheme('light', event)"
+                  class="theme-opt" title="Light" aria-label="Light theme">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button type="button" data-theme-opt="dark" onclick="setTheme('dark', event)"
+                  class="theme-opt" title="Dark" aria-label="Dark theme">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M20 13.6A8 8 0 1 1 10.4 4a6.2 6.2 0 0 0 9.6 9.6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast notifications -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- Movie Details Modal -->
+  <div id="movie-modal" class="modal-overlay hidden" aria-modal="true" role="dialog">
+    <div class="modal-content">
+      <button class="modal-close" aria-label="Close modal">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="modal-body" id="modal-body-content">
+        <!-- Populated dynamically by JS -->
+      </div>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- ============================================================
+         SECTION 1: ADD A NEW MOVIE
+         Title has autocomplete, genre is a dropdown, year is a dropdown
+         ============================================================ -->
+    <section class="section" id="add-section">
+      <div class="section-header">
+        <span class="section-label">Add a movie</span>
+        <div class="section-line"></div>
+      </div>
+
+      <form id="add-movie-form" class="form-row" aria-label="Add a new movie">
+
+        <!-- Title input with autocomplete dropdown -->
+        <div class="form-group autocomplete-wrapper">
+          <label for="movie-title">Title</label>
+          <input type="text" id="movie-title" placeholder="Start typing a movie title..." required aria-required="true" autocomplete="off">
+          <div class="autocomplete-dropdown" id="autocomplete-dropdown" role="listbox" aria-label="Movie suggestions"></div>
+        </div>
+
+        <!-- Hidden fields for genre and year (auto-filled by autocomplete) -->
+        <input type="hidden" id="movie-genre" required aria-required="true">
+        <input type="hidden" id="movie-year" required aria-required="true">
+
+        <button type="submit" class="btn btn-primary" id="btn-add">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add
+        </button>
+      </form>
+    </section>
+
+    <!-- ============================================================
+         SECTION 2: MY MOVIES — Compact card grid with toolbar
+         ============================================================ -->
+    <section class="section" id="list-section">
+      <div class="section-header">
+        <span class="section-label">My movies <span class="movie-count" id="movie-count"></span></span>
+        <div class="section-line"></div>
+      </div>
+
+      <!-- Sort & Filter Toolbar -->
+      <div class="toolbar" id="toolbar">
+        <div class="toolbar-group">
+          <label for="sort-select" class="toolbar-label">Sort</label>
+          <select id="sort-select" class="toolbar-select">
+            <option value="added-desc">Newest added</option>
+            <option value="added-asc">Oldest added</option>
+            <option value="title-asc">A → Z</option>
+            <option value="title-desc">Z → A</option>
+            <option value="year-desc">Year (newest)</option>
+            <option value="year-asc">Year (oldest)</option>
+            <option value="favorites">Favorites first</option>
+          </select>
+        </div>
+        <div class="toolbar-group">
+          <label for="filter-genre" class="toolbar-label">Genre</label>
+          <select id="filter-genre" class="toolbar-select">
+            <option value="all">All genres</option>
+          </select>
+        </div>
+        <div class="toolbar-group">
+          <label for="filter-status" class="toolbar-label">Status</label>
+          <select id="filter-status" class="toolbar-select">
+            <option value="all">All</option>
+            <option value="want">Want to Watch</option>
+            <option value="watching">Watching</option>
+            <option value="watched">Watched</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="movie-list" id="movie-list" role="list" aria-label="Saved movies"></div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 3: OMDb SEARCH
+         ============================================================ -->
+    <section class="section" id="search-section">
+      <div class="section-header">
+        <span class="section-label">Search OMDb</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Search for a movie..." aria-label="Search movie title">
+        <button class="btn btn-primary" id="btn-search" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Search
+        </button>
+      </div>
+
+      <div class="search-results" id="search-results" role="list" aria-label="Search results"></div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p><strong>Cinememo</strong> is a beautifully minimalist personal watchlist designed to help you curate, rate, and track your favorite films without the clutter.</p>
+  </footer>
+
+  <script src="script.js"></script>
+
+</body>
+</html>
